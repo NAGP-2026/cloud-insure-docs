@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InsureDocs – Self-Service Document Portal</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Header ── */
+    header {
+      width: 100%;
+      background: #1a3c5e;
+      color: #fff;
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header .logo { font-size: 1.7rem; font-weight: 700; letter-spacing: 1px; }
+    header .tagline { font-size: 0.85rem; opacity: 0.75; }
+
+    /* ── Main Card ── */
+    main {
+      width: 100%;
+      max-width: 620px;
+      margin: 50px auto;
+      padding: 0 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.10);
+      padding: 40px 44px;
+    }
+    .card h2 { color: #1a3c5e; margin-bottom: 6px; font-size: 1.4rem; }
+    .card p.subtitle {
+      color: #6b7280;
+      font-size: 0.92rem;
+      margin-bottom: 32px;
+    }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 2px dashed #93c5fd;
+      border-radius: 10px;
+      background: #eff6ff;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+      position: relative;
+    }
+    .drop-zone.dragover { background: #dbeafe; border-color: #3b82f6; }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-zone .icon { font-size: 2.8rem; margin-bottom: 10px; }
+    .drop-zone p { color: #374151; font-size: 0.95rem; }
+    .drop-zone .browse-link { color: #2563eb; text-decoration: underline; font-weight: 600; }
+    .drop-zone .hint { font-size: 0.78rem; color: #9ca3af; margin-top: 6px; }
+
+    /* ── Selected file preview ── */
+    #file-preview {
+      display: none;
+      margin-top: 18px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.88rem;
+      color: #374151;
+      word-break: break-all;
+    }
+    #file-preview .fname { font-weight: 600; color: #1a3c5e; }
+    #file-preview .fsize { color: #6b7280; }
+
+    /* ── Upload Button ── */
+    #upload-btn {
+      width: 100%;
+      margin-top: 22px;
+      padding: 14px;
+      background: #1a3c5e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #upload-btn:hover:not(:disabled) { background: #16325a; }
+    #upload-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    #progress-wrap {
+      display: none;
+      margin-top: 18px;
+      background: #e5e7eb;
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #2563eb;
+      width: 0%;
+      border-radius: 99px;
+      transition: width .3s ease;
+    }
+
+    /* ── Status Message ── */
+    #status-msg {
+      display: none;
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    #status-msg.success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    #status-msg.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* ── Recent Uploads (mock) ── */
+    .section-title { font-size: 1rem; font-weight: 600; color: #374151; margin: 32px 0 12px; }
+    #upload-history { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    #upload-history li {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #374151;
+    }
+    #upload-history li .ts { color: #9ca3af; font-size: 0.78rem; }
+    #upload-history li .badge {
+      background: #d1fae5; color: #065f46;
+      border-radius: 99px; padding: 2px 10px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    #no-uploads { color: #9ca3af; font-size: 0.88rem; text-align: center; padding: 12px 0; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 0.78rem;
+      margin: 10px 0 30px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🛡️ InsureDocs</div>
+    <div class="tagline">Secure Self-Service Document Portal</div>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Upload Your Document</h2>
+    <p class="subtitle">
+      Securely upload identity proofs, claim forms, or supporting evidence.
+      Files are encrypted and stored on AWS S3.
+    </p>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="*/*" />
+      <div class="icon">📄</div>
+      <p>Drag &amp; drop your file here, or <span class="browse-link">Browse</span></p>
+      <p class="hint">Supports PDF, JPG, PNG, DOCX and more · Max 10 MB</p>
+    </div>
+
+    <!-- File Preview -->
+    <div id="file-preview">
+      📎 <span class="fname" id="fname-label"></span>
+      &nbsp;<span class="fsize" id="fsize-label"></span>
+    </div>
+
+    <!-- Upload Button -->
+    <button id="upload-btn" disabled>
+      <span id="btn-icon">⬆️</span>
+      <span id="btn-text">Upload Document</span>
+    </button>
+
+    <!-- Progress Bar -->
+    <div id="progress-wrap"><div id="progress-bar"></div></div>
+
+    <!-- Status Message -->
+    <div id="status-msg"></div>
+
+    <!-- Upload History -->
+    <div class="section-title">Recent Uploads (this session)</div>
+    <ul id="upload-history">
+      <li id="no-uploads"><span>No uploads yet.</span></li>
+    </ul>
+  </div>
+</main>
+
+<footer>© 2026 InsureDocs Portal &nbsp;|&nbsp; Hosted on AWS EC2 &nbsp;|&nbsp; All data encrypted in transit and at rest</footer>
+
+<script>
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const filePreview= document.getElementById('file-preview');
+  const fnameLabel = document.getElementById('fname-label');
+  const fsizeLabel = document.getElementById('fsize-label');
+  const uploadBtn  = document.getElementById('upload-btn');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressBar  = document.getElementById('progress-bar');
+  const statusMsg  = document.getElementById('status-msg');
+  const uploadList = document.getElementById('upload-history');
+  const noUploads  = document.getElementById('no-uploads');
+
+  let selectedFile = null;
+
+  // ── Format file size ──────────────────────────────────────────────────────
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  // ── Select file ───────────────────────────────────────────────────────────
+  function handleFileSelect(file) {
+    selectedFile = file;
+    fnameLabel.textContent = file.name;
+    fsizeLabel.textContent = '(' + formatSize(file.size) + ')';
+    filePreview.style.display = 'block';
+    uploadBtn.disabled = false;
+    hideStatus();
+  }
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) handleFileSelect(fileInput.files[0]);
+  });
+
+  // ── Drag & Drop ───────────────────────────────────────────────────────────
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
+  });
+
+  // ── Upload ────────────────────────────────────────────────────────────────
+  uploadBtn.addEventListener('click', () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('document', selectedFile);
+
+    uploadBtn.disabled = true;
+    document.getElementById('btn-text').textContent = 'Uploading…';
+    progressWrap.style.display = 'block';
+    progressBar.style.width = '0%';
+    hideStatus();
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        progressBar.style.width = pct + '%';
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      progressBar.style.width = '100%';
+      const res = JSON.parse(xhr.responseText);
+      if (xhr.status === 200 && res.success) {
+        showStatus('success', `✅ "${res.fileName}" uploaded successfully to S3!`);
+        addHistoryEntry(res.fileName, res.s3Key);
+        resetForm();
+      } else {
+        showStatus('error', `❌ Upload failed: ${res.message}`);
+        resetBtn();
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      showStatus('error', '❌ Network error. Please check your connection and try again.');
+      resetBtn();
+    });
+
+    xhr.open('POST', '/upload');
+    xhr.send(formData);
+  });
+
+  function showStatus(type, msg) {
+    statusMsg.className = type;
+    statusMsg.textContent = msg;
+    statusMsg.style.display = 'block';
+  }
+
+  function hideStatus() {
+    statusMsg.style.display = 'none';
+    statusMsg.className = '';
+  }
+
+  function resetBtn() {
+    uploadBtn.disabled = false;
+    document.getElementById('btn-text').textContent = 'Upload Document';
+    progressWrap.style.display = 'none';
+  }
+
+  function resetForm() {
+    resetBtn();
+    selectedFile = null;
+    fileInput.value = '';
+    filePreview.style.display = 'none';
+    progressWrap.style.display = 'none';
+  }
+
+  function addHistoryEntry(fileName, s3Key) {
+    if (noUploads) noUploads.remove();
+    const li = document.createElement('li');
+    const ts = new Date().toLocaleTimeString();
+    li.innerHTML = `
+      <div>
+        <div style="font-weight:600;word-break:break-all">${fileName}</div>
+        <div class="ts">${ts} &nbsp;·&nbsp; ${s3Key}</div>
+      </div>
+      <span class="badge">Stored ✓</span>
+    `;
+    uploadList.prepend(li);
+  }
+</script>
+</body>
+</html>

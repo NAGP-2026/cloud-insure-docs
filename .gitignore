@@ -1,0 +1,36 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Lambda packaging internals (keep the zip for deployment)
+lambda/package/
+
+# Environment & secrets – NEVER commit
+.env
+.env.*
+*.pem
+*.key
+aws-credentials
+credentials
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# Build artifacts
+dist/
+build/
+*.class
+
+# Logs
+*.log
+logs/
+
+# Unused source folder (Java placeholder)
+src/
