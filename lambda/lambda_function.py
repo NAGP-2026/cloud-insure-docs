@@ -6,7 +6,7 @@ insurance-docs S3 bucket.
 
 Actions:
   1. Read the uploaded object's metadata from the S3 event.
-  2. Extract the Content-Type.
+  2. Extract the Content-Type (from file extension via mimetypes).
   3. Insert file_name, content_type, and upload_timestamp into RDS (MySQL).
   4. Write structured log lines to CloudWatch Logs (via print / logging).
   5. [BONUS] Retrieve a secret from AWS Secrets Manager and log it.
@@ -16,54 +16,45 @@ Environment Variables (set in Lambda configuration):
   DB_PORT       – RDS port (default 3306)
   DB_NAME       – Database name
   DB_USER       – Database username
-  DB_SECRET_ARN – ARN of the Secrets Manager secret that holds the DB password
+  DB_PASSWORD   – Database password (direct env var)
   SECRET_ARN    – ARN of a bonus secret to demonstrate Secrets Manager usage
 """
 
 import json
 import logging
+import mimetypes
 import os
 from datetime import datetime, timezone
 from urllib.parse import unquote_plus
 
 import boto3
 import pymysql
+from botocore.config import Config
 
 # ─── Logger setup ─────────────────────────────────────────────────────────────
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# ─── AWS clients (reused across warm invocations) ─────────────────────────────
-s3_client      = boto3.client('s3')
-secrets_client = boto3.client('secretsmanager')
-
 # ─── Environment ──────────────────────────────────────────────────────────────
-DB_HOST       = os.environ.get('DB_HOST', '')
-DB_PORT       = int(os.environ.get('DB_PORT', 3306))
-DB_NAME       = os.environ.get('DB_NAME', 'insurance_docs')
-DB_USER       = os.environ.get('DB_USER', 'lambda_user')
-DB_SECRET_ARN = os.environ.get('DB_SECRET_ARN', '')   # Secrets Manager ARN for DB password
-SECRET_ARN    = os.environ.get('SECRET_ARN', '')       # Bonus: any other secret to demo
-
-
-# ─── Helper: get secret from Secrets Manager ──────────────────────────────────
-def get_secret(secret_arn: str) -> dict:
-    """Retrieve and JSON-parse a secret from AWS Secrets Manager."""
-    response = secrets_client.get_secret_value(SecretId=secret_arn)
-    secret_string = response.get('SecretString', '{}')
-    return json.loads(secret_string)
+DB_HOST     = os.environ.get('DB_HOST', '')
+DB_PORT     = int(os.environ.get('DB_PORT', 3306))
+DB_NAME     = os.environ.get('DB_NAME', 'insurance_docs')
+DB_USER     = os.environ.get('DB_USER', 'lambda_user')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', '')          # DB password as env var
+SECRET_ARN  = os.environ.get('SECRET_ARN', '')           # Bonus: Secrets Manager demo ARN
+REGION      = os.environ.get('AWS_REGION', 'ap-south-1')
 
 
 # ─── Helper: get DB connection ─────────────────────────────────────────────────
-def get_db_connection(db_password: str):
+def get_db_connection():
     """Return a pymysql connection using env-configured credentials."""
     return pymysql.connect(
         host=DB_HOST,
         port=DB_PORT,
         user=DB_USER,
-        password=db_password,
+        password=DB_PASSWORD,
         database=DB_NAME,
-        connect_timeout=5,
+        connect_timeout=10,
         cursorclass=pymysql.cursors.DictCursor,
     )
 
@@ -92,53 +83,66 @@ def lambda_handler(event, context):
     logger.info("Event: %s", json.dumps(event))
 
     # ── BONUS: Retrieve and log a demo secret from Secrets Manager ─────────
+    # Lambda is in VPC; if no VPC endpoint for Secrets Manager, this may fail.
+    # Handled gracefully – core functionality does NOT depend on this.
     if SECRET_ARN:
         try:
-            bonus_secret = get_secret(SECRET_ARN)
+            # Short timeout so Lambda doesn't hang if no VPC endpoint for Secrets Manager
+            _sm_config = Config(connect_timeout=3, read_timeout=3, retries={'max_attempts': 0})
+            secrets_client = boto3.client('secretsmanager', region_name=REGION, config=_sm_config)
+            response = secrets_client.get_secret_value(SecretId=SECRET_ARN)
+            bonus_secret = json.loads(response.get('SecretString', '{}'))
             # Log only the key names – never log secret values in production!
-            logger.info("[BONUS] Secrets Manager secret keys retrieved: %s", list(bonus_secret.keys()))
-            # Print to CloudWatch console (visible in Lambda logs)
-            print(f"[BONUS] Secret retrieved from Secrets Manager (keys only): {list(bonus_secret.keys())}")
+            logger.info(
+                "[BONUS] Secrets Manager secret '%s' retrieved. Keys: %s",
+                SECRET_ARN.split(':')[-1], list(bonus_secret.keys())
+            )
+            print(f"[BONUS] Secret retrieved from Secrets Manager. Keys: {list(bonus_secret.keys())}")
         except Exception as exc:
-            logger.warning("[BONUS] Could not retrieve bonus secret: %s", exc)
+            logger.warning(
+                "[BONUS] Could not retrieve bonus secret (no VPC endpoint for Secrets Manager): %s", exc
+            )
+            print(f"[BONUS] Secrets Manager unavailable from VPC (no NAT/endpoint): {type(exc).__name__}")
 
     # ── Process each S3 record in the event ───────────────────────────────
     for record in event.get('Records', []):
-        bucket = record['s3']['bucket']['name']
-        key    = unquote_plus(record['s3']['object']['key'])
+        bucket         = record['s3']['bucket']['name']
+        key            = unquote_plus(record['s3']['object']['key'])
+        file_size      = record['s3']['object'].get('size', 0)
+        event_time_str = record.get('eventTime', datetime.now(timezone.utc).isoformat())
 
-        logger.info("Processing s3://%s/%s", bucket, key)
+        logger.info("Processing s3://%s/%s (size: %d bytes)", bucket, key, file_size)
 
-        # 1. Read object metadata from S3
+        # 1. Extract file name and Content-Type from key (no S3 API call needed)
+        file_name    = key.split('/')[-1]   # e.g. "1717400000000-my_doc.pdf"
+        content_type, _ = mimetypes.guess_type(file_name)
+        if not content_type:
+            content_type = 'application/octet-stream'
+
+        # 2. Parse upload timestamp from event (reliable, no S3 API call)
         try:
-            head = s3_client.head_object(Bucket=bucket, Key=key)
-        except Exception as exc:
-            logger.error("Failed to head_object s3://%s/%s : %s", bucket, key, exc)
-            raise
-
-        content_type     = head.get('ContentType', 'application/octet-stream')
-        last_modified    = head.get('LastModified', datetime.now(timezone.utc))
-        upload_timestamp = last_modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # millisecond precision
-
-        file_name = key.split('/')[-1]   # e.g.  "1717400000000-my_doc.pdf"
+            dt = datetime.fromisoformat(event_time_str.replace('Z', '+00:00'))
+        except Exception:
+            dt = datetime.now(timezone.utc)
+        upload_timestamp = dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
         logger.info(
-            "File metadata – Name: %s | ContentType: %s | Timestamp: %s",
-            file_name, content_type, upload_timestamp,
+            "File metadata – Name: %s | ContentType: %s | Timestamp: %s | Size: %d bytes",
+            file_name, content_type, upload_timestamp, file_size,
+        )
+        print(
+            f"[FILE] name={file_name} content_type={content_type} "
+            f"timestamp={upload_timestamp} size={file_size} bucket={bucket} key={key}"
         )
 
-        # 2. Retrieve DB password from Secrets Manager
-        try:
-            db_secret  = get_secret(DB_SECRET_ARN)
-            db_password = db_secret.get('password', '')
-        except Exception as exc:
-            logger.error("Could not fetch DB secret: %s", exc)
-            raise
+        # 3. Insert into RDS (Lambda connects to RDS within VPC)
+        if not DB_HOST or not DB_PASSWORD:
+            logger.error("DB_HOST or DB_PASSWORD not configured. Skipping DB insert.")
+            continue
 
-        # 3. Insert into RDS
         connection = None
         try:
-            connection = get_db_connection(db_password)
+            connection = get_db_connection()
             with connection.cursor() as cursor:
                 ensure_table(cursor)
                 insert_sql = """
@@ -150,11 +154,11 @@ def lambda_handler(event, context):
                 inserted_id = cursor.lastrowid
             connection.commit()
             logger.info(
-                "DB record inserted. id=%d | file=%s | type=%s | ts=%s",
+                "DB record inserted successfully. id=%d | file=%s | type=%s | ts=%s",
                 inserted_id, file_name, content_type, upload_timestamp,
             )
             print(
-                f"[DB INSERT] id={inserted_id} file_name={file_name} "
+                f"[DB INSERT] SUCCESS id={inserted_id} file_name={file_name} "
                 f"content_type={content_type} upload_timestamp={upload_timestamp} "
                 f"s3_key={key}"
             )
