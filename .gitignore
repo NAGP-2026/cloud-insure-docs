@@ -34,3 +34,7 @@ logs/
 
 # Unused source folder (Java placeholder)
 src/
+
+# Internal tracking files (not for submission)
+CONTEXT.md
+docs/console-step-by-step.md
