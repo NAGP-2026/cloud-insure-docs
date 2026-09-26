@@ -15,6 +15,11 @@
 
 ## 🏗️ Architecture Overview
 
+![InsureDocs Architecture Diagram](docs/architecture-diagram.png)
+
+<details>
+<summary>Text representation</summary>
+
 ```
                     ┌──────────────────────────────────────────────────────┐
                     │           AWS Region: ap-south-1 (Mumbai)            │
@@ -43,6 +48,8 @@
 ```
 
 > **NAT Gateway** is depicted in the architecture diagram (`docs/architecture-diagram.md`) but not deployed due to Free Tier cost constraints (~$32/month). EC2 instances are in public subnets as a workaround.
+
+</details>
 
 ---
 
