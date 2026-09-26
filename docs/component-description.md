@@ -8,8 +8,8 @@
 | Attribute | Value |
 |---|---|
 | CIDR | 10.0.0.0/16 |
-| Region | us-east-1 |
-| Availability Zones | us-east-1a, us-east-1b |
+| Region | ap-south-1 (Mumbai) |
+| Availability Zones | ap-south-1a, ap-south-1b |
 
 **Purpose:** Provides a logically isolated network environment for all AWS resources. All components (EC2, RDS, Lambda) reside within the VPC to prevent direct public exposure of backend systems.
 
@@ -74,10 +74,11 @@
 
 | Attribute | Value |
 |---|---|
-| Instance type | t2.micro (Free Tier eligible) |
+| Instance type | t3.micro (Free Tier eligible) |
 | OS | Amazon Linux 2023 |
-| Runtime | Node.js 18 LTS |
+| Runtime | Node.js 18.20.8 LTS |
 | Application | Express.js file upload server |
+| Subnets | Public-AZ1 + Public-AZ2 (NAT Gateway workaround) |
 
 **Purpose:** Hosts the InsureDocs web portal. Accepts file uploads from users and streams them directly to S3 using the AWS SDK — no temporary disk storage needed.
 
@@ -94,8 +95,8 @@
 
 | Attribute | Value |
 |---|---|
-| Bucket name | insurance-docs-bucket |
-| Region | us-east-1 |
+| Bucket name | insurance-docs-bucket-742020474887 |
+| Region | ap-south-1 (Mumbai) |
 | Versioning | Enabled |
 | Encryption | SSE-S3 (AES-256) |
 | Public access | Blocked (all four settings) |
@@ -118,40 +119,44 @@
 | Attribute | Value |
 |---|---|
 | Function name | process-uploaded-document |
-| Runtime | Python 3.12 |
+| Runtime | Python 3.14 |
 | Trigger | S3 PutObject (prefix: `uploads/`) |
-| Memory | 256 MB |
+| Memory | 128 MB |
 | Timeout | 30 seconds |
+| VPC Subnets | Private-App-AZ1 + Private-App-AZ2 |
 
 **Purpose:** Serverless event-driven processor. Automatically triggered on every S3 upload; extracts metadata and records it in RDS.
 
 **Actions:**
-1. Reads object metadata using `head_object`
-2. Extracts `ContentType`
-3. Retrieves DB password securely from Secrets Manager
-4. Inserts `file_name`, `content_type`, `upload_timestamp` into RDS
-5. Logs all steps to CloudWatch Logs
-6. [BONUS] Retrieves and logs keys from a demo Secrets Manager secret
+1. Receives S3 event (bucket name, key, size, timestamp)
+2. Extracts `ContentType` from filename using Python `mimetypes` library
+3. Parses `upload_timestamp` from S3 event time (no extra API call)
+4. Connects to RDS MySQL using `DB_PASSWORD` environment variable
+5. Inserts `file_name`, `content_type`, `upload_timestamp`, `s3_bucket`, `s3_key` into RDS
+6. Logs all steps to CloudWatch Logs (structured output)
+7. [BONUS] Attempts to retrieve bonus secret from Secrets Manager (fails gracefully with 3s timeout if no VPC endpoint — logs warning)
 
 **Security Considerations:**
-- Lambda execution role follows least privilege (S3 HeadObject, SecretsManager GetSecretValue, RDS VPC access, CloudWatch Logs)
-- Lambda runs inside the VPC in Private App Subnets to reach RDS privately
-- No database credentials in code — all retrieved from Secrets Manager at runtime
+- Lambda execution role follows least privilege (SecretsManager GetSecretValue, RDS VPC access, CloudWatch Logs)
+- Lambda runs inside the VPC in Private App Subnets to reach RDS via internal VPC routing
+- DB password stored as Lambda environment variable (Secrets Manager access attempted but gracefully handled if unavailable)
+- boto3 connection timeout set to 3s for Secrets Manager to prevent Lambda hanging
 
 **High Availability:** Lambda is fully managed and scales concurrently; AWS handles availability automatically.
 
 ---
 
-## 9. Amazon RDS (MySQL 8.0)
+## 9. Amazon RDS (MySQL 8.4.9)
 
 | Attribute | Value |
 |---|---|
-| Engine | MySQL 8.0 |
+| DB Identifier | insuredocs-db |
+| Engine | MySQL 8.4.9 |
 | Instance class | db.t3.micro (Free Tier eligible) |
-| Multi-AZ | Enabled (Standby in AZ-2) |
+| Multi-AZ | No (Single-AZ — Free Tier constraint) |
 | Storage | 20 GB gp2, encrypted |
 | Public accessibility | No |
-| Subnet group | DB Private Subnets (AZ-1 + AZ-2) |
+| Subnet group | insuredocs-db-subnet-group (Private DB AZ-1 + AZ-2) |
 
 **Purpose:** Stores metadata for every uploaded document: file name, content type, and upload timestamp.
 
@@ -181,13 +186,34 @@
 
 ## 11. Amazon CloudWatch
 
-**Purpose:**
-- Collects Lambda execution logs (structured JSON output)
-- Monitors ALB request metrics and EC2 CPU utilization for ASG scaling decisions
-- [BONUS] Custom dashboard showing upload counts, Lambda duration, RDS connections
-- [BONUS] Alarms: CPU > 70% (EC2), Lambda errors > 5/min, RDS connections > 80%
+**Purpose:** Centralized observability service for logs, metrics, dashboards, and alarms.
 
-**Security Considerations:** Log groups are encrypted; IAM policies restrict who can read logs.
+**Implemented Components:**
+
+**Log Groups:**
+- `/aws/lambda/process-uploaded-document` — structured Lambda execution logs (invocations, file metadata, DB insert results, Secrets Manager warnings)
+
+**[BONUS] Dashboard: `InsureDocs-Dashboard`**
+
+| Widget | Metric | Source |
+|---|---|---|
+| EC2 CPU Utilization | CPUUtilization (avg) | EC2 → InsureDocs-ASG |
+| ALB Request Count | RequestCount | ApplicationELB → InsureDocs-ALB (ap-south-1a + ap-south-1b) |
+| Lambda Invocations | Invocations | Lambda → process-uploaded-document |
+| Lambda Errors | Errors | Lambda → process-uploaded-document |
+
+**[BONUS] Alarm: `InsureDocs-HighCPU`**
+- **Metric:** EC2 CPUUtilization (InsureDocs-ASG)
+- **Threshold:** Greater than 70%
+- **Period:** 5 minutes
+- **Action:** SNS notification → `InsureDocs-Alerts` topic → email alert
+
+**Security Considerations:**
+- Log groups are encrypted at rest using AWS-managed keys
+- IAM policies restrict log access to authorized roles only
+- Alarm state changes are sent via SNS (email confirmation required)
+
+**High Availability:** CloudWatch is a fully managed AWS service with built-in redundancy.
 
 ---
 
