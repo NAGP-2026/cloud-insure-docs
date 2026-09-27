@@ -121,7 +121,7 @@ cloud/
 - Each AWS service, its purpose, security considerations, HA considerations
 
 ### 3. Running Application Demo *(2 min video)*
-🎬 **Video:** *(Paste Google Drive link here)*
+🎬 **Video:** [https://drive.google.com/file/d/1540P2RPrbRCFMDXr-c5j8nxhW6lnMilb/view?usp=sharing](https://drive.google.com/file/d/1540P2RPrbRCFMDXr-c5j8nxhW6lnMilb/view?usp=sharing)
 - Portal access via ALB URL
 - File upload functionality
 - File visible in S3
@@ -129,7 +129,7 @@ cloud/
 - RDS entry creation
 
 ### 4. AWS Configuration Walkthrough *(8 min video)*
-🎬 **Video:** *(Paste Google Drive link here)*
+🎬 **Video:** [https://drive.google.com/file/d/10jwGC-JuZiiFeSgUzkZmzz4D6KXwdwvL/view?usp=sharing](https://drive.google.com/file/d/10jwGC-JuZiiFeSgUzkZmzz4D6KXwdwvL/view?usp=sharing)
 - IAM setup (users, groups, roles, policies)
 - VPC setup (subnets, route tables, IGW)
 - Security Groups & NACLs
