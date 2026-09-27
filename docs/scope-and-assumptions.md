@@ -8,7 +8,7 @@
 This document covers the first MVP release of the InsureDocs customer-facing document upload portal, deployed on AWS using cloud-native services.
 
 ### In Scope
-- Single AWS Region deployment (us-east-1)
+- Single AWS Region deployment (ap-south-1)
 - VPC with 6 subnets across 2 Availability Zones
 - EC2-based web application behind an Application Load Balancer
 - Auto Scaling Group for compute elasticity
@@ -36,10 +36,10 @@ This document covers the first MVP release of the InsureDocs customer-facing doc
 
 1. **Single AWS Account:** A new Free Tier eligible AWS account is used for this assignment. All resources are within this single account.
 
-2. **Single Region:** All resources are deployed in `us-east-1` (N. Virginia) for simplicity and Free Tier availability.
+2. **Single Region:** All resources are deployed in `ap-south-1` (Mumbai) for simplicity and Free Tier availability.
 
 3. **Free Tier Constraints:**
-   - EC2 instances use `t2.micro` (750 hrs/month free)
+   - EC2 instances use `t3.micro` (750 hrs/month free)
    - RDS uses `db.t3.micro` (750 hrs/month free, single-AZ in practice; Multi-AZ described architecturally)
    - Lambda: 1M free requests/month and 400,000 GB-seconds compute — well within budget for demo
 
@@ -97,7 +97,7 @@ This document covers the first MVP release of the InsureDocs customer-facing doc
 | Single-AZ RDS | Single point of failure at DB tier | Enable Multi-AZ for production |
 | No authentication | Anyone with the URL can upload files | Add Cognito/OAuth in next release |
 | File type not validated | Malicious files could be uploaded | Add Lambda trigger for antivirus scan |
-| t2.micro performance | Limited CPU/RAM under heavy load | ASG will scale out but each instance is limited |
+| t3.micro performance | Limited CPU/RAM under heavy load | ASG will scale out but each instance is limited |
 
 ---
 

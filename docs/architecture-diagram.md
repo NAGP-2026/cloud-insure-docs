@@ -107,7 +107,6 @@
 |---|---|---|---|
 | `alb-sg` | HTTP:80 | 0.0.0.0/0 | Accept internet traffic |
 | `ec2-sg` | HTTP:80 | alb-sg | Only ALB can reach EC2 |
-| `ec2-sg` | SSH:22 | 0.0.0.0/0 | Temporary debug (remove after) |
 | `lambda-sg` | (none inbound) | – | Lambda initiates outbound only |
 | `rds-sg` | MySQL:3306 | lambda-sg | Only Lambda can reach RDS |
 

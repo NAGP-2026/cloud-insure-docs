@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 80;
 // Credentials are sourced from the EC2 Instance Profile (IAM Role),
 // so no hard-coded keys are needed here.
 const s3 = new AWS.S3({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'ap-south-1',
 });
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'insurance-docs-bucket';
@@ -85,5 +85,5 @@ app.post('/upload', upload.single('document'), async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Insurance Portal running on port ${PORT}`);
   console.log(`S3 Bucket: ${BUCKET_NAME}`);
-  console.log(`Region   : ${process.env.AWS_REGION || 'us-east-1'}`);
+  console.log(`Region   : ${process.env.AWS_REGION || 'ap-south-1'}`);
 });
