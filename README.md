@@ -6,10 +6,10 @@
 
 ## 📹 Demo Videos
 
-| Deliverable | Link | Duration |
+| Deliverable | Link |
 |---|---|---|
-| **Running Application Demo** | *(Paste Google Drive link here)* | Max 2 min |
-| **AWS Configuration Walkthrough** | *(Paste Google Drive link here)* | Max 8 min |
+| **Running Application Demo** | https://drive.google.com/file/d/1540P2RPrbRCFMDXr-c5j8nxhW6lnMilb/view?usp=sharing |
+| **AWS Configuration Walkthrough** | https://drive.google.com/file/d/10jwGC-JuZiiFeSgUzkZmzz4D6KXwdwvL/view?usp=sharing |
 
 ---
 
