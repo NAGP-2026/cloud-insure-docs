@@ -108,42 +108,42 @@ aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames
 # Public Subnet AZ-1
 PUB1=$(aws ec2 create-subnet \
   --vpc-id $VPC_ID --cidr-block 10.0.1.0/24 \
-  --availability-zone us-east-1a \
+  --availability-zone ap-south-1a \
   --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Public-AZ1}]' \
   --query 'Subnet.SubnetId' --output text)
 
 # Public Subnet AZ-2
 PUB2=$(aws ec2 create-subnet \
   --vpc-id $VPC_ID --cidr-block 10.0.2.0/24 \
-  --availability-zone us-east-1b \
+  --availability-zone ap-south-1b \
   --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Public-AZ2}]' \
   --query 'Subnet.SubnetId' --output text)
 
 # Private App Subnet AZ-1
 APP1=$(aws ec2 create-subnet \
   --vpc-id $VPC_ID --cidr-block 10.0.11.0/24 \
-  --availability-zone us-east-1a \
+  --availability-zone ap-south-1a \
   --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Private-App-AZ1}]' \
   --query 'Subnet.SubnetId' --output text)
 
 # Private App Subnet AZ-2
 APP2=$(aws ec2 create-subnet \
   --vpc-id $VPC_ID --cidr-block 10.0.12.0/24 \
-  --availability-zone us-east-1b \
+  --availability-zone ap-south-1b \
   --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Private-App-AZ2}]' \
   --query 'Subnet.SubnetId' --output text)
 
 # Private DB Subnet AZ-1
 DB1=$(aws ec2 create-subnet \
   --vpc-id $VPC_ID --cidr-block 10.0.21.0/24 \
-  --availability-zone us-east-1a \
+  --availability-zone ap-south-1a \
   --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Private-DB-AZ1}]' \
   --query 'Subnet.SubnetId' --output text)
 
 # Private DB Subnet AZ-2
 DB2=$(aws ec2 create-subnet \
   --vpc-id $VPC_ID --cidr-block 10.0.22.0/24 \
-  --availability-zone us-east-1b \
+  --availability-zone ap-south-1b \
   --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Private-DB-AZ2}]' \
   --query 'Subnet.SubnetId' --output text)
 
@@ -229,7 +229,8 @@ echo "Security Groups – ALB:$SG_ALB EC2:$SG_EC2 Lambda:$SG_LAMBDA RDS:$SG_RDS"
 # Create bucket (replace YOUR_ACCOUNT_ID with your actual account ID)
 aws s3api create-bucket \
   --bucket insurance-docs-bucket-YOUR_ACCOUNT_ID \
-  --region us-east-1
+  --region ap-south-1 \
+  --create-bucket-configuration LocationConstraint=ap-south-1
 
 # Block all public access
 aws s3api put-public-access-block \
@@ -396,7 +397,7 @@ aws ec2 create-launch-template \
   --version-description "v1" \
   --launch-template-data "{
     \"ImageId\": \"ami-0c02fb55956c7d316\",
-    \"InstanceType\": \"t2.micro\",
+    \"InstanceType\": \"t3.micro\",
     \"IamInstanceProfile\": {\"Name\": \"EC2InstanceProfile\"},
     \"SecurityGroupIds\": [\"$SG_EC2\"],
     \"UserData\": \"$(base64 -w 0 infrastructure/ec2-userdata.sh)\",
@@ -474,7 +475,7 @@ Set these in your EC2 Launch Template User Data (already done via `ec2-userdata.
 
 ```bash
 export S3_BUCKET_NAME="insurance-docs-bucket-YOUR_ACCOUNT_ID"
-export AWS_REGION="us-east-1"
+export AWS_REGION="ap-south-1"
 export PORT=80
 ```
 
@@ -514,7 +515,7 @@ npm install
 
 # 3. Set environment variables
 export S3_BUCKET_NAME=your-bucket-name
-export AWS_REGION=us-east-1
+export AWS_REGION=ap-south-1
 export PORT=3000
 
 # 4. Start the application

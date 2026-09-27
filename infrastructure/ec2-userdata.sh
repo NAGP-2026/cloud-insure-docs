@@ -49,7 +49,7 @@ const path    = require('path');
 const app  = express();
 const PORT = process.env.PORT || 80;
 
-const s3 = new AWS.S3({ region: process.env.AWS_REGION || 'us-east-1' });
+const s3 = new AWS.S3({ region: process.env.AWS_REGION || 'ap-south-1' });
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'insurance-docs-bucket';
 
 const upload = multer({
